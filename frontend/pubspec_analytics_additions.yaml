@@ -1,0 +1,10 @@
+# Add these to pubspec.yaml dependencies:
+
+dependencies:
+  charts_flutter: ^0.12.0          # Simple, lightweight charts
+  intl: ^0.19.0                     # Date formatting for charts
+  syncfusion_flutter_charts: ^24.1.41  # (Optional) Professional charts
+
+# Or use this version for better performance:
+dev_dependencies:
+  charts_flutter: ^0.12.0

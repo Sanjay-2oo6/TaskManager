@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="task_manager">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>task_manager</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Firebase SDK (required for web) -->
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-messaging-compat.js"></script>
+  <script>
+    // Firebase configuration for web
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5-KGJDPZK0tI7Xc7wgL7dHwk-m0hJl4U",
+      authDomain: "task-manager-32829.firebaseapp.com",
+      projectId: "task-manager-32829",
+      storageBucket: "task-manager-32829.appspot.com",
+      messagingSenderId: "102859385783616169318",
+      appId: "1:102859385783616169318:web:c4d5e6f7g8h9i0j1k2l3m4n5"
+    };
+    
+    // Initialize Firebase (only if not already initialized)
+    if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
