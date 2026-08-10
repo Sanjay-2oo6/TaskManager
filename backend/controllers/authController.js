@@ -59,7 +59,7 @@ const createUser = async (req, res) => {
       return sendError(res, 'Name or email is too long', 400);
     }
 
-    // SECURITY: Role whitelist — only super admins can create admins, admins can create members
+    // SECURITY: Role whitelist — admins can create both member and admin accounts within their org
     const actingRole = req.user?.role;
     let assignedRole = 'member'; // default
     
@@ -70,8 +70,8 @@ const createUser = async (req, res) => {
           assignedRole = role;
         }
       } else if (actingRole === 'admin') {
-        // Admin can only create member accounts
-        if (role === 'member') {
+        // ✅ UPDATED: Admin can now create both member and admin accounts within their organization
+        if (['member', 'admin'].includes(role)) {
           assignedRole = role;
         }
       }

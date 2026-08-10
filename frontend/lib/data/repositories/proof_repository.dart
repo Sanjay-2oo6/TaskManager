@@ -44,19 +44,29 @@ class ProofRepository {
       }
 
       for (var file in beforeFiles) {
-        if (file.path != null) {
+        if (file.path != null && file.path!.isNotEmpty) {
           final ext = extension(file.path!);
           final target = '${proofsDir.path}/${_uuid.v4()}$ext';
-          await File(file.path!).copy(target);
-          localBeforePaths.add(target);
+          try {
+            await File(file.path!).copy(target);
+            localBeforePaths.add(target);
+            print('✅ Before file saved: $target');
+          } catch (e) {
+            print('❌ Failed to copy before file: $e');
+          }
         }
       }
       for (var file in afterFiles) {
-        if (file.path != null) {
+        if (file.path != null && file.path!.isNotEmpty) {
           final ext = extension(file.path!);
           final target = '${proofsDir.path}/${_uuid.v4()}$ext';
-          await File(file.path!).copy(target);
-          localAfterPaths.add(target);
+          try {
+            await File(file.path!).copy(target);
+            localAfterPaths.add(target);
+            print('✅ After file saved: $target');
+          } catch (e) {
+            print('❌ Failed to copy after file: $e');
+          }
         }
       }
     } else {
@@ -89,6 +99,7 @@ class ProofRepository {
 
     final subBox = Hive.box<Submission>(AppConstants.submissionsBox);
     await subBox.add(submission);
+    print('✅ Submission saved to Hive: taskId=$taskId, beforeFiles=${localBeforePaths.length}, afterFiles=${localAfterPaths.length}');
 
     final syncAction = SyncAction(
       id: _uuid.v4(),
@@ -96,19 +107,15 @@ class ProofRepository {
       organizationId: organizationId,
       payload: {
         'taskId': taskId,
-        'userId': userId,
         'description': description ?? '',
-        'localBeforePaths': localBeforePaths,
-        'localAfterPaths': localAfterPaths,
-        // Web fallbacks
-        'webBeforeBytes': webBeforeBytes,
-        'webAfterBytes': webAfterBytes,
-        'webBeforeNames': webBeforeNames,
-        'webAfterNames': webAfterNames,
+        // ✅ Use exact field names that sync_service expects
+        'beforePaths': localBeforePaths,
+        'afterPaths': localAfterPaths,
       },
       timestamp: DateTime.now(),
     );
 
     await _syncService.addToQueue(syncAction);
+    print('✅ Sync action queued: ${syncAction.id}');
   }
 }

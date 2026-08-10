@@ -38,53 +38,114 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
-  // Initialize Firebase (optional on web - not required for testing)
   try {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    debugPrint('✅ Firebase initialized successfully');
-  } catch (e) {
-    // Firebase is optional - app works without it (just no push notifications)
-    debugPrint('⚠️ Firebase init skipped (optional on web): $e');
+    // Load environment variables
+    try {
+      await dotenv.load(fileName: ".env");
+      debugPrint('✅ .env file loaded successfully');
+    } catch (e) {
+      debugPrint('⚠️ .env file not found, using defaults: $e');
+    }
+
+    // Initialize Firebase (optional on web - not required for testing)
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      debugPrint('✅ Firebase initialized successfully');
+    } catch (e) {
+      // Firebase is optional - app works without it (just no push notifications)
+      debugPrint('⚠️ Firebase init skipped (optional on web): $e');
+    }
+
+    // Initialize local notifications channel (Android 8+)
+    try {
+      await _initLocalNotifications();
+      debugPrint('✅ Local notifications initialized');
+    } catch (e) {
+      debugPrint('⚠️ Local notifications init failed: $e');
+    }
+
+    // Initialize Hive
+    try {
+      await Hive.initFlutter();
+      debugPrint('✅ Hive initialized');
+
+      // Register Adapters
+      Hive.registerAdapter(SyncActionTypeAdapter());
+      Hive.registerAdapter(SyncActionAdapter());
+      Hive.registerAdapter(SubmissionAdapter());
+      debugPrint('✅ Hive adapters registered');
+
+      // Open Boxes
+      await Hive.openBox<Submission>(AppConstants.submissionsBox);
+      debugPrint('✅ Hive boxes opened');
+    } catch (e) {
+      debugPrint('⚠️ Hive initialization failed: $e');
+      // Continue - Hive is optional for this build
+    }
+
+    // Initialize Global Services
+    try {
+      await SyncService().init();
+      debugPrint('✅ Sync service initialized');
+    } catch (e) {
+      debugPrint('⚠️ Sync service init failed: $e');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    debugPrint('✅ Shared preferences loaded');
+
+    // Initialize Auth State (Persistent Session)
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+    );
+
+    await container.read(authNotifierProvider.notifier).checkAuthStatus();
+    debugPrint('✅ Auth state initialized');
+
+    runApp(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TaskManagerApp(),
+      ),
+    );
+  } catch (e, stackTrace) {
+    debugPrint('❌ Fatal error during initialization: $e');
+    debugPrint('Stack trace: $stackTrace');
+    
+    // Show error screen if initialization fails
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                const SizedBox(height: 24),
+                const Text(
+                  'App Initialization Failed',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    'Error: $e',
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
-
-  // Initialize local notifications channel (Android 8+)
-  await _initLocalNotifications();
-
-  // Initialize Hive
-  await Hive.initFlutter();
-
-  // Register Adapters
-  Hive.registerAdapter(SyncActionTypeAdapter());
-  Hive.registerAdapter(SyncActionAdapter());
-  Hive.registerAdapter(SubmissionAdapter());
-
-  // Open Boxes
-  await Hive.openBox<Submission>(AppConstants.submissionsBox);
-
-  // Initialize Global Services
-  await SyncService().init();
-
-  final prefs = await SharedPreferences.getInstance();
-
-  // Initialize Auth State (Persistent Session)
-  final container = ProviderContainer(
-    overrides: [
-      sharedPreferencesProvider.overrideWithValue(prefs),
-    ],
-  );
-
-  await container.read(authNotifierProvider.notifier).checkAuthStatus();
-
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const TaskManagerApp(),
-    ),
-  );
 }
 
 /// Create the Android notification channel and initialize the local plugin.

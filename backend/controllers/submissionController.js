@@ -139,8 +139,8 @@ exports.createSubmission = async (req, res) => {
           body: `${employee.name} ${isResubmission ? 'resubmitted' : 'submitted'} proof for: "${task.title}"`,
           data: { taskId: taskId.toString(), submissionId: submission._id.toString(), type: isResubmission ? 'TASK_RESUBMITTED' : 'NEW_SUBMISSION' }
         });
-  } catch (error) {
-    logger.error('Submission notification error', { error: error.message });
+      } catch (error) {
+        logger.error('Submission notification error', { error: error.message });
       }
     });
   } catch (error) {

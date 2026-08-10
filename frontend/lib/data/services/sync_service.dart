@@ -59,6 +59,7 @@ class SyncService {
 
     for (final action in actions) {
       try {
+        _logger.i('📦 Processing: ${action.type} (${action.id})');
         final success = await _performSync(action);
         if (success) {
           await _syncBox.delete(action.id);
@@ -67,12 +68,13 @@ class SyncService {
           _logger.w('⏸️  Sync paused for: ${action.id}');
           break;
         }
-      } catch (e) {
-        _logger.e('❌ Sync error: $e');
+      } catch (e, stackTrace) {
+        _logger.e('❌ Sync error for ${action.id}: $e\n$stackTrace');
         break;
       }
     }
     _isProcessing = false;
+    _logger.i('🏁 Sync completed. ${_syncBox.length} items remaining in queue');
   }
 
   Future<bool> _performSync(SyncAction action) async {
@@ -104,40 +106,67 @@ class SyncService {
   }
 
   Future<bool> _syncSubmitProof(SyncAction action) async {
-    final payload = action.payload;
-    final taskId = payload['taskId'];
-    final beforePaths = List<String>.from(payload['beforePaths'] ?? []);
-    final afterPaths = List<String>.from(payload['afterPaths'] ?? []);
-    final description = payload['description'] ?? '';
+    try {
+      final payload = action.payload;
+      final taskId = payload['taskId'];
+      final beforePaths = List<String>.from(payload['beforePaths'] ?? []);
+      final afterPaths = List<String>.from(payload['afterPaths'] ?? []);
+      final description = payload['description'] ?? '';
 
-    final formData = FormData.fromMap({
-      'taskId': taskId,
-      'organizationId': action.organizationId,
-      'description': description,
-    });
+      _logger.i('📤 Syncing submission - Task: $taskId, Before files: ${beforePaths.length}, After files: ${afterPaths.length}');
 
-    for (String path in beforePaths) {
-      final f = File(path);
-      if (f.existsSync()) {
-        formData.files.add(MapEntry(
-          'beforeFiles',
-          await MultipartFile.fromFile(path, filename: path.split('/').last),
-        ));
+      final formData = FormData.fromMap({
+        'taskId': taskId,
+        'organizationId': action.organizationId,
+        'description': description,
+      });
+
+      // ✅ File validation and addition
+      int beforeCount = 0;
+      for (String path in beforePaths) {
+        if (path.isEmpty) continue;
+        final f = File(path);
+        if (f.existsSync()) {
+          formData.files.add(MapEntry(
+            'beforeFiles',
+            await MultipartFile.fromFile(path, filename: path.split('/').last),
+          ));
+          beforeCount++;
+        } else {
+          _logger.w('⚠️ Before file not found: $path');
+        }
       }
-    }
 
-    for (String path in afterPaths) {
-      final f = File(path);
-      if (f.existsSync()) {
-        formData.files.add(MapEntry(
-          'afterFiles',
-          await MultipartFile.fromFile(path, filename: path.split('/').last),
-        ));
+      int afterCount = 0;
+      for (String path in afterPaths) {
+        if (path.isEmpty) continue;
+        final f = File(path);
+        if (f.existsSync()) {
+          formData.files.add(MapEntry(
+            'afterFiles',
+            await MultipartFile.fromFile(path, filename: path.split('/').last),
+          ));
+          afterCount++;
+        } else {
+          _logger.w('⚠️ After file not found: $path');
+        }
       }
-    }
 
-    final response = await ApiClient().createSubmission(formData);
-    return response.statusCode == 201;
+      _logger.i('✅ Files ready: $beforeCount before, $afterCount after');
+
+      final response = await ApiClient().createSubmission(formData);
+      
+      if (response.statusCode == 201) {
+        _logger.i('✅ Submission synced successfully: ${response.data}');
+        return true;
+      } else {
+        _logger.e('❌ Submission sync failed with status ${response.statusCode}: ${response.data}');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      _logger.e('❌ Submission sync error: $e\n$stackTrace');
+      return false;
+    }
   }
 
   Future<bool> _syncCreateMessage(SyncAction action) async {
