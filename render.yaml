@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: task-manager-backend
+    env: node
+    repo: https://github.com/Sanjay-2oo6/TaskManager
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+        # Add these in Render dashboard (they're sensitive):
+        # MONGODB_URI: mongodb+srv://taskmanager:PASSWORD@cluster...
+        # JWT_SECRET: (use 'openssl rand -hex 32')
+        # AWS_ACCESS_KEY_ID: (from AWS)
+        # AWS_SECRET_ACCESS_KEY: (from AWS)
+        # AWS_REGION: ap-south-1
+        # AWS_BUCKET_NAME: (your bucket)
+        # FIREBASE_SERVICE_ACCOUNT: (single-line JSON)
+        # BACKEND_URL: (set after deployment)
