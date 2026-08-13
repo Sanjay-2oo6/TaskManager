@@ -64,8 +64,13 @@ app.use(compression({
 // 🛡️ SECURITY FIX 0.13: Environment-specific CORS configuration
 if (process.env.NODE_ENV === 'production') {
   // Production: Strict CORS - only allow our domain
+  const frontendUrl = process.env.FRONTEND_URL || process.env.BACKEND_URL || 'http://localhost:3000';
   const allowedOrigins = [
-    process.env.FRONTEND_URL || 'https://yourdomain.com',
+    frontendUrl,
+    'https://taskmanager-0lok.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'http://192.168.0.0/8', // Local network
   ];
   
   app.use(cors({
