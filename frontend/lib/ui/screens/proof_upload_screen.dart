@@ -7,6 +7,7 @@ import '../../presentation/widgets/offline_banner.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import '../../state/task_providers.dart';
+import '../../state/auth_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final syncServiceProvider = Provider((ref) => SyncService());
@@ -68,6 +69,22 @@ class _ProofUploadScreenState extends ConsumerState<ProofUploadScreen> {
         description: _descriptionController.text,
       );
 
+      print('✅ Submission queued. Waiting for sync to backend...');
+
+      // ✅ FIX: Wait for sync service to process the queue
+      // This ensures the submission reaches the backend before we navigate
+      final syncService = ref.read(syncServiceProvider);
+      int maxWaitTime = 0;
+      const checkInterval = Duration(milliseconds: 500);
+      const maxWaitDuration = Duration(seconds: 15);
+
+      while (syncService.isProcessing && maxWaitTime < maxWaitDuration.inMilliseconds) {
+        await Future.delayed(checkInterval);
+        maxWaitTime += checkInterval.inMilliseconds;
+      }
+
+      print('✅ Sync completed or timed out. Queue length: ${syncService.queueLength}');
+
       if (mounted) {
         setState(() {
           _beforeFiles = [];
@@ -77,6 +94,10 @@ class _ProofUploadScreenState extends ConsumerState<ProofUploadScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Submission sent successfully!'), backgroundColor: AppTheme.successGreen),
         );
+        
+        // ✅ FIX: Refresh task data before closing screens
+        await ref.read(taskDetailProvider(widget.taskId).notifier).loadTask(widget.taskId);
+        
         Navigator.pop(context); // Close Upload Screen
         Navigator.pop(context); // Close Detail Screen
       }
