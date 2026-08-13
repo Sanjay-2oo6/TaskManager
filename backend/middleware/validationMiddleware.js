@@ -238,7 +238,7 @@ Object.assign(validationSchemas, {
   // POST /submissions (create submission)
   createSubmission: Joi.object({
     taskId: commonSchemas.objectId.required(),
-    description: commonSchemas.text,
+    description: commonSchemas.text.allow('', null).optional(),
     status: Joi.string()
       .valid('pending', 'approved', 'rejected')
       .default('pending')
