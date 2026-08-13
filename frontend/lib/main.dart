@@ -78,18 +78,29 @@ void main() async {
 
       // Open Boxes
       await Hive.openBox<Submission>(AppConstants.submissionsBox);
-      debugPrint('✅ Hive boxes opened');
+      debugPrint('✅ Hive submission box opened');
+      
+      // Try to open sync queue box
+      try {
+        await Hive.openBox<SyncAction>('sync_queue');
+        debugPrint('✅ Hive sync_queue box opened');
+      } catch (e) {
+        debugPrint('⚠️ Hive sync_queue box error (will retry in SyncService): $e');
+      }
     } catch (e) {
-      debugPrint('⚠️ Hive initialization failed: $e');
+      debugPrint('❌ Hive initialization failed: $e');
       // Continue - Hive is optional for this build
     }
 
     // Initialize Global Services
     try {
-      await SyncService().init();
-      debugPrint('✅ Sync service initialized');
-    } catch (e) {
-      debugPrint('⚠️ Sync service init failed: $e');
+      final syncService = SyncService();
+      await syncService.init();
+      debugPrint('✅ Sync service initialized successfully');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Sync service init failed: $e');
+      debugPrint('Stack trace: $stackTrace');
+      // Continue - app can still work with sync failing
     }
 
     final prefs = await SharedPreferences.getInstance();

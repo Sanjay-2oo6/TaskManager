@@ -108,6 +108,9 @@ exports.createSubmission = async (req, res) => {
       { status: 'submitted', submission: submission._id },
       { new: true }
     );
+    
+    console.log(`✅ Task status updated: ${taskId} → submitted (updatedTask exists: ${!!updatedTask})`);
+    console.log(`Task status is now: ${updatedTask?.status}`);
 
     // Add history entry for resubmission
     if (updatedTask && isResubmission) {
@@ -118,6 +121,8 @@ exports.createSubmission = async (req, res) => {
         details: 'Employee resubmitted work after previous rejection'
       });
       await updatedTask.save();
+      console.log(`✅ Resubmission history added`);
+    }
     }
 
     // Emit real-time pulse with full data

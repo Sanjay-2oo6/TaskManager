@@ -127,11 +127,16 @@ class SyncService {
         if (path.isEmpty) continue;
         final f = File(path);
         if (f.existsSync()) {
-          formData.files.add(MapEntry(
-            'beforeFiles',
-            await MultipartFile.fromFile(path, filename: path.split('/').last),
-          ));
-          beforeCount++;
+          try {
+            formData.files.add(MapEntry(
+              'beforeFiles',
+              await MultipartFile.fromFile(path, filename: path.split('/').last),
+            ));
+            beforeCount++;
+            _logger.i('✅ Added before file: ${path.split('/').last}');
+          } catch (e) {
+            _logger.e('❌ Failed to add before file: $e');
+          }
         } else {
           _logger.w('⚠️ Before file not found: $path');
         }
@@ -142,11 +147,16 @@ class SyncService {
         if (path.isEmpty) continue;
         final f = File(path);
         if (f.existsSync()) {
-          formData.files.add(MapEntry(
-            'afterFiles',
-            await MultipartFile.fromFile(path, filename: path.split('/').last),
-          ));
-          afterCount++;
+          try {
+            formData.files.add(MapEntry(
+              'afterFiles',
+              await MultipartFile.fromFile(path, filename: path.split('/').last),
+            ));
+            afterCount++;
+            _logger.i('✅ Added after file: ${path.split('/').last}');
+          } catch (e) {
+            _logger.e('❌ Failed to add after file: $e');
+          }
         } else {
           _logger.w('⚠️ After file not found: $path');
         }
@@ -154,7 +164,11 @@ class SyncService {
 
       _logger.i('✅ Files ready: $beforeCount before, $afterCount after');
 
+      _logger.i('📡 Sending POST to: ${AppConstants.apiBaseUrl}/submissions');
       final response = await ApiClient().createSubmission(formData);
+      
+      _logger.i('📥 Response status: ${response.statusCode}');
+      _logger.i('📥 Response body: ${response.data}');
       
       if (response.statusCode == 201) {
         _logger.i('✅ Submission synced successfully: ${response.data}');
@@ -164,7 +178,8 @@ class SyncService {
         return false;
       }
     } catch (e, stackTrace) {
-      _logger.e('❌ Submission sync error: $e\n$stackTrace');
+      _logger.e('❌ Submission sync error: $e');
+      _logger.e('❌ Stack trace: $stackTrace');
       return false;
     }
   }
