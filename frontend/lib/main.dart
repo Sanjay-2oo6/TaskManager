@@ -41,14 +41,23 @@ void main() async {
   // Load environment variables
   await dotenv.load(fileName: ".env");
 
-  // Initialize Firebase (optional on web - not required for testing)
+  // ✅ FIX 12: Initialize Firebase with comprehensive error handling
   try {
+    // Try to initialize Firebase
+    // On web: May use config from HTML if available
+    // On mobile: Will initialize from platform-specific config
     await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    } catch (e) {
+      // Background messaging may not be available on web
+      debugPrint('⚠️ Background messaging unavailable: $e');
+    }
     debugPrint('✅ Firebase initialized successfully');
   } catch (e) {
-    // Firebase is optional - app works without it (just no push notifications)
-    debugPrint('⚠️ Firebase init skipped (optional on web): $e');
+    // Firebase is optional - app works without push notifications
+    // This is expected on web development without proper setup
+    debugPrint('ℹ️ Firebase not available (app continues without push): $e');
   }
 
   // Initialize local notifications channel (Android 8+)
@@ -109,6 +118,12 @@ Future<void> _initLocalNotifications() async {
 /// Called from HomeScreen after the user is authenticated.
 Future<void> setupPushNotifications() async {
   try {
+    // ✅ FIX 12: Check if Firebase is available before setting up push
+    if (Firebase.apps.isEmpty) {
+      debugPrint('ℹ️ Firebase not initialized - push notifications unavailable');
+      return;
+    }
+
     final messaging = FirebaseMessaging.instance;
 
     // Request permission (Android 13+ and iOS require explicit consent)
@@ -184,8 +199,8 @@ Future<void> setupPushNotifications() async {
     });
 
   } catch (e) {
-    // Firebase may not be available on web in development
-    debugPrint('⚠️ Push notifications unavailable: $e');
+    // Firebase or push notifications may not be available
+    debugPrint('ℹ️ Push notifications unavailable: $e');
   }
 }
 

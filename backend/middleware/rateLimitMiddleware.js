@@ -9,6 +9,13 @@ const loginLimiter = rateLimit({
   message: 'Too many login attempts from this IP. Please try again in 15 minutes.',
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
+  // ✅ FIX 13: Skip rate limiting for OPTIONS (preflight) requests
+  skip: (req) => {
+    // Don't rate limit preflight requests
+    if (req.method === 'OPTIONS') return true;
+    // Don't rate limit authenticated admin users (for testing)
+    return req.user?.role === 'admin';
+  },
   // Use default IP-based key generator (handles IPv4 and IPv6 properly)
   handler: (req, res) => {
     console.warn(`🚨 RATE_LIMIT: Login - IP: ${req.ip} - Exceeded 5 attempts`);
@@ -17,10 +24,6 @@ const loginLimiter = rateLimit({
       message: 'Too many login attempts. Please try again in 15 minutes.',
       retryAfter: Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000)
     });
-  },
-  skip: (req) => {
-    // Don't rate limit authenticated admin users (for testing)
-    return req.user?.role === 'admin';
   }
 });
 
@@ -57,6 +60,8 @@ const apiLimiter = rateLimit({
   message: 'Too many requests from this IP. Please slow down.',
   standardHeaders: true,
   legacyHeaders: false,
+  // ✅ FIX 13: Skip rate limiting for OPTIONS (preflight) requests
+  skip: (req) => req.method === 'OPTIONS',
   // Use default IP-based key generator (handles IPv4 and IPv6 properly)
   handler: (req, res) => {
     console.warn(`🚨 RATE_LIMIT: API - IP: ${req.ip} - Exceeded 100 req/min on ${req.path}`);
@@ -72,6 +77,8 @@ const apiLimiter = rateLimit({
 const submissionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5, // 5 submissions per hour
+  // ✅ FIX 13: Skip rate limiting for OPTIONS (preflight) requests
+  skip: (req) => req.method === 'OPTIONS',
   keyGenerator: (req) => {
     // If authenticated, use user ID, otherwise return undefined for default IP limiting
     if (req.user?.id) {
