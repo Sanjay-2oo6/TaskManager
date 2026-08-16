@@ -16,6 +16,7 @@ class SubmissionReview {
   final List<String> afterFileNames;
   final String? description;
   final String status;
+  final String? previousSubmissionId; // ✅ FIX 10: Track resubmission chain
 
   SubmissionReview({
     required this.id,
@@ -28,6 +29,7 @@ class SubmissionReview {
     required this.afterFileNames,
     this.description,
     required this.status,
+    this.previousSubmissionId,
   });
 
   factory SubmissionReview.fromJson(Map<String, dynamic> json) {
@@ -42,6 +44,7 @@ class SubmissionReview {
       afterFileNames: List<String>.from(json['afterFileNames'] ?? []),
       description: json['description'],
       status: json['status'] ?? 'pending',
+      previousSubmissionId: json['previousSubmissionId']?.toString(), // ✅ FIX 10: Parse resubmission link
     );
   }
 }
