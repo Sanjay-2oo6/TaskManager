@@ -17,6 +17,11 @@ const submissionSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  previousSubmissionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Submission',
+    default: null // Links to rejected submission if this is a resubmission
+  },
   taskTitle: {
     type: String,
     required: true

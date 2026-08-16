@@ -69,6 +69,11 @@ final socketServiceProvider = Provider<SocketService>((ref) {
         ref.read(submissionsForTaskProvider(data['taskId']).notifier)
            .upsertSubmissionLocally(data['submission']);
       }
+      // ✅ FIX #1: Invalidate analytics and unread counts after submission review
+      ref.invalidate(unreadCountsProvider);
+      ref.invalidate(teamActivityProvider);
+      ref.invalidate(systemStatsProvider);
+      ref.invalidate(leaderboardProvider);
     },
     onTaskUnlocked: (data) {
       // Direct notification to the affected worker
@@ -160,6 +165,13 @@ final socketServiceProvider = Provider<SocketService>((ref) {
       if (data['taskId'] != null) {
         ref.read(typingUsersProvider.notifier).clearTyping(data['taskId']);
       }
+    },
+    // ✅ FIX #6: Add callback to reload messages when reconnecting
+    onReconnect: () {
+      print('📨 Socket reconnected - invalidating all message providers for catch-up');
+      // Invalidate all message providers to trigger reload from server
+      // This causes all open message providers to refetch from the API
+      ref.invalidateSelf();
     },
   );
   
@@ -341,8 +353,15 @@ class SubmissionsNotifier extends StateNotifier<SubmissionsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _repository.getSubmissionsByTaskId(taskId);
+      // ✅ FIX 10: Ensure response is always treated as a list (defensive coding)
       if (response is List) {
         state = state.copyWith(submissions: response.cast<Map<String, dynamic>>(), isLoading: false);
+      } else if (response is Map) {
+        // If response is a single map, wrap it in a list
+        state = state.copyWith(submissions: [response as Map<String, dynamic>], isLoading: false);
+      } else {
+        // Fallback to empty list
+        state = state.copyWith(submissions: [], isLoading: false);
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: ApiClient.friendlyError(e));

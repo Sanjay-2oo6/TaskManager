@@ -57,6 +57,11 @@ const activeViewers = new Map();
 io.on('connection', (socket) => {
   console.log(`📡 Real-time Client Connected: ${socket.id} (user: ${socket.user.id})`);
   
+  // ✅ FIX 9: Auto-join organization room on connection for real-time updates
+  const orgRoom = `org_${socket.user.organizationId}`;
+  socket.join(orgRoom);
+  console.log(`🏢 User ${socket.user.id} joined org room: ${orgRoom}`);
+  
   // Chat Room Logic
   socket.on('join-task', async (taskId) => {
     try {

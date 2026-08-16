@@ -1512,9 +1512,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Single
   Widget _buildSubmissionsViewer() {
     final state = ref.watch(submissionsForTaskProvider(widget.taskId ?? ''));
     if (state.isLoading) return const CircularProgressIndicator(color: AppTheme.primaryCoral);
-    if (state.submissions.isEmpty) return const Text('No submissions logged for this task.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13));
+    // ✅ FIX 10: Ensure submissions is always a list before mapping
+    final submissionsList = state.submissions is List ? state.submissions : [];
+    if (submissionsList.isEmpty) return const Text('No submissions logged for this task.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13));
     return Column(
-      children: state.submissions.map((s) => Container(
+      children: submissionsList.map((s) => Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(color: AppTheme.surfaceWhite, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.borderLight)),
         child: Theme(

@@ -20,6 +20,7 @@ class SocketService {
   final Function(dynamic) onTyping;
   final Function(dynamic) onStopTyping;
   final Function(dynamic) onMessagesRead;
+  final Function()? onReconnect;  // ✅ ADD: Callback when reconnecting
   
   String? _currentTaskId; // "Sticky" room to auto-rejoin on reconnect
 
@@ -33,6 +34,7 @@ class SocketService {
     required this.onTyping,
     required this.onStopTyping,
     required this.onMessagesRead,
+    this.onReconnect,  // ✅ ADD: Optional callback
   });
 
   Future<void> connect() async {
@@ -64,6 +66,14 @@ class SocketService {
     _socket!.on('error', (data) => print('❌ Socket Error: $data'));
     _socket!.onReconnect((_) => print('🔄 Socket Reconnecting...'));
     _socket!.on('reconnect_attempt', (data) => print('🔄 Socket Reconnect Attempt: $data'));
+
+    // ✅ FIX #6: Handle reconnection - trigger message catch-up
+    _socket!.on('connect', (_) {
+      if (onReconnect != null) {
+        print('🔗 Socket reconnected - triggering message catch-up');
+        onReconnect!();
+      }
+    });
 
     _socket!.on('task-updated', (data) {
       print('🔄 Real-time Pulse: Task Update Received');

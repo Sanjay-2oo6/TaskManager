@@ -27,94 +27,81 @@ const logger = require('../utils/logger');
  * @access  Private/Super Admin
  */
 const createOrganization = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  
   try {
     const { name, slug, memberLimit, adminName, adminEmail, adminPassword } = req.body;
     
     // Validation
     if (!name || !slug) {
-      await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Organization name and slug are required' });
     }
     
     if (!adminName || !adminEmail || !adminPassword) {
-      await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Admin details (name, email, password) are required' });
     }
     
     // Validate password strength
     const passwordError = getPasswordError(adminPassword);
     if (passwordError) {
-      await session.abortTransaction();
       return res.status(400).json({ success: false, message: passwordError });
     }
     
     // Check if slug already exists
-    const existingOrg = await Organization.findOne({ slug: slug.toLowerCase().trim() }).session(session);
+    const existingOrg = await Organization.findOne({ slug: slug.toLowerCase().trim() });
     if (existingOrg) {
-      await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Organization slug already exists' });
     }
     
     // Check if admin email already exists
-    const existingUser = await User.findOne({ email: adminEmail.toLowerCase().trim() }).session(session);
+    const existingUser = await User.findOne({ email: adminEmail.toLowerCase().trim() });
     if (existingUser) {
-      await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Admin email already exists' });
     }
     
-    // ✅ SECURITY FIX: Use transaction for atomicity
-    const tempOrgId = new mongoose.Types.ObjectId();
+    // ✅ Create organization FIRST so we have the ID
+    const organization = await Organization.create({
+      name: sanitizeText(name.trim()),
+      slug: slug.toLowerCase().trim(),
+      memberLimit: memberLimit || 10,
+      memberCount: 1,
+      createdBy: req.user.id,
+    });
     
-    const admin = await User.create([{
+    // ✅ Create admin user with organization ID
+    const admin = await User.create({
       name: sanitizeText(adminName.trim()),
       email: sanitizeText(adminEmail.toLowerCase().trim()),
       password: adminPassword,
       role: 'admin',
-      organizationId: tempOrgId,
-    }], { session });
+      organizationId: organization._id,  // ✅ Use real organization ID
+    });
     
-    const organization = await Organization.create([{
-      name: sanitizeText(name.trim()),
-      slug: slug.toLowerCase().trim(),
-      adminId: admin[0]._id,
-      memberLimit: memberLimit || 10,
-      memberCount: 1,
-      createdBy: req.user.id,
-    }], { session });
-    
-    admin[0].organizationId = organization[0]._id;
-    await admin[0].save({ session });
-    
-    await session.commitTransaction();
+    // ✅ Update organization with admin ID
+    organization.adminId = admin._id;
+    await organization.save();
     
     logger.admin('Organization created', {
       superAdminId: req.user.id,
-      organizationId: organization[0]._id,
-      organizationSlug: organization[0].slug,
-      adminId: admin[0]._id,
-      adminEmail: admin[0].email,
+      organizationId: organization._id,
+      organizationSlug: organization.slug,
+      adminId: admin._id,
+      adminEmail: admin.email,
     });
     
     // ✅ SECURITY: Don't expose admin password hash in response
-    const adminSafe = admin[0].toObject();
-    delete adminSafe.password;  // Remove password hash before sending to client
+    const adminSafe = admin.toObject();
+    delete adminSafe.password;
     
     res.status(201).json({
       success: true,
       data: {
-        organization: organization[0],
-        admin: adminSafe,  // ✅ Password removed
+        organization,
+        admin: adminSafe,
       },
-      message: 'Organization created successfully',
+      message: 'Organization created successfully with admin account',
     });
   } catch (error) {
-    await session.abortTransaction();
+    logger.error('Organization creation error', { error: error.message });
     res.status(500).json({ success: false, message: error.message });
-  } finally {
-    await session.endSession();
   }
 };
 

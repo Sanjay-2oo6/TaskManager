@@ -92,6 +92,7 @@ exports.createSubmission = async (req, res) => {
       task: taskId,
       employee: userId,
       organizationId, // ✅ MULTI-TENANT: Add organizationId
+      previousSubmissionId: isResubmission ? wasRejected._id : null, // ✅ FIX 8: Link to rejected submission
       taskTitle: task.title,
       employeeName: employee.name,
       beforeFiles: beforeFilesKeys,

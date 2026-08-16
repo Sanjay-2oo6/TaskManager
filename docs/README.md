@@ -114,11 +114,40 @@ This documentation suite provides comprehensive guides for developers, system ad
 - **Response Time:** 24 hours (business days)
 - **Emergency Hotline:** +1-555-TASK-911
 
+### 🚨 Critical Issues & Fixes
+
+**August 2026 Audit Update:**
+
+See the following documents for complete issue analysis and fix strategy:
+
+1. **[FUNCTIONALITY_AUDIT_REPORT.md](../FUNCTIONALITY_AUDIT_REPORT.md)** - Complete audit of all issues
+   - 4 Critical issues (blocking production)
+   - 5 High-priority bugs (degrading UX)
+   - 6 Medium-priority issues
+   - Impact analysis for each issue
+
+2. **[DOCUMENTATION_CLEANUP_AND_FIX_PLAN.md](DOCUMENTATION_CLEANUP_AND_FIX_PLAN.md)** - Implementation strategy
+   - Detailed fix instructions for each issue
+   - Implementation rules and best practices
+   - Dependency matrix and testing procedures
+   - Success criteria and timelines
+
+**Critical Issues Blocking Production:**
+- ✅ Task Status NOT Syncing to Frontend
+- ✅ Admin Cannot View Team Members
+- ✅ Offline Submissions Fail - Missing organizationId
+- ✅ Organization Data Isolation Gaps
+
+[View Complete Audit →](../FUNCTIONALITY_AUDIT_REPORT.md)
+
+---
+
 ### Contributing
 - Fork the repository
 - Submit pull requests
 - Report issues on GitHub
 - Improve documentation
+- See [DOCUMENTATION_CLEANUP_AND_FIX_PLAN.md](DOCUMENTATION_CLEANUP_AND_FIX_PLAN.md) for implementation guidelines
 
 ---
 
