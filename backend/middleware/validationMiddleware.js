@@ -286,6 +286,11 @@ Object.assign(validationSchemas, {
  */
 const validateRequest = (schemaName) => {
   return (req, res, next) => {
+    // ✅ FIX 11: Skip validation for OPTIONS (preflight) requests
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     const schema = validationSchemas[schemaName];
 
     if (!schema) {
@@ -332,11 +337,17 @@ const validateRequest = (schemaName) => {
 };
 
 /**
+/**
  * Validate URL parameters
  * Usage: app.get('/resource/:id', validateParams('objectId', 'id'), controller)
  */
 const validateParams = (schemaName, paramName) => {
   return (req, res, next) => {
+    // ✅ FIX 11: Skip validation for OPTIONS (preflight) requests
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     const schema = validationSchemas[schemaName] || commonSchemas[schemaName];
 
     if (!schema) {
@@ -367,6 +378,11 @@ const validateParams = (schemaName, paramName) => {
  */
 const validateQuery = (schema) => {
   return (req, res, next) => {
+    // ✅ FIX 11: Skip validation for OPTIONS (preflight) requests
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     const { error, value } = schema.validate(req.query, {
       abortEarly: true,
       stripUnknown: true
