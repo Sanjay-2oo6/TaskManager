@@ -116,8 +116,8 @@ exports.getSignedImageUrl = async (key) => {
     Key: key
   });
 
-  // URL expires in 1 hour
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  // ✅ FIX: URL expires in 24 hours (was 1 hour, causing expired links)
+  return await getSignedUrl(s3Client, command, { expiresIn: 86400 });
 };
 
 /**

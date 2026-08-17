@@ -12,6 +12,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/services/socket_service.dart';
 import '../../data/models/message.dart';
 import 'message_providers.dart';
+import 'submission_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Providers
@@ -36,30 +37,47 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
 final socketServiceProvider = Provider<SocketService>((ref) {
   final socketService = SocketService(
     onTaskUpdate: (data) {
+      print('🔄 Socket handler onTaskUpdate called');
+      print('   data: $data');
+      print('   task status: ${data['task']?['status']}');
       if (data['task'] != null) {
         final task = Task.fromJson(data['task']);
+        print('   ✅ Task parsed: id=${task.id}, status=${task.status}');
         ref.read(tasksProvider.notifier).upsertTask(task);
         ref.read(taskDetailProvider(task.id).notifier).syncTask(task);
+        print('   ✅ Task synced to providers');
       } else {
+        print('   ⚠️ No task data, full reload');
         ref.read(tasksProvider.notifier).loadTasks(silent: true);
       }
+      // ✅ Force refresh of analytics so they reload immediately
       ref.invalidate(teamActivityProvider);
       ref.invalidate(systemStatsProvider);
       ref.invalidate(leaderboardProvider);
+      print('   ✅ All providers invalidated');
     },
     onNewSubmission: (data) {
+      print('📸 Socket handler onNewSubmission called');
+      print('   taskId: ${data['taskId']}');
+      print('   submissionId: ${data['submissionId']}');
       if (data['task'] != null) {
         final task = Task.fromJson(data['task']);
         ref.read(tasksProvider.notifier).upsertTask(task);
         ref.read(taskDetailProvider(task.id).notifier).syncTask(task);
+        print('   ✅ Task updated');
       }
       if (data['submission'] != null && data['taskId'] != null) {
         ref.read(submissionsForTaskProvider(data['taskId']).notifier)
            .addSubmissionLocally(data['submission']);
+        print('   ✅ Submission added to task');
       }
+      // ✅ FIX: Invalidate submissions list in admin review screen
+      ref.invalidate(pendingSubmissionsProvider);
       ref.invalidate(teamActivityProvider);
+      print('   ✅ Admin submissions provider invalidated');
     },
     onSubmissionReviewed: (data) {
+      print('⚖️ Socket handler onSubmissionReviewed called');
       if (data['task'] != null) {
         final task = Task.fromJson(data['task']);
         ref.read(tasksProvider.notifier).upsertTask(task);
@@ -70,10 +88,13 @@ final socketServiceProvider = Provider<SocketService>((ref) {
            .upsertSubmissionLocally(data['submission']);
       }
       // ✅ FIX #1: Invalidate analytics and unread counts after submission review
+      // Also invalidate pending submissions list so admin sees updated status
+      ref.invalidate(pendingSubmissionsProvider);
       ref.invalidate(unreadCountsProvider);
       ref.invalidate(teamActivityProvider);
       ref.invalidate(systemStatsProvider);
       ref.invalidate(leaderboardProvider);
+      print('   ✅ All providers invalidated after submission review');
     },
     onTaskUnlocked: (data) {
       // Direct notification to the affected worker
@@ -93,10 +114,25 @@ final socketServiceProvider = Provider<SocketService>((ref) {
       ref.read(tasksProvider.notifier).loadTasks(silent: true);
     },
     onNewMessage: (data) {
+      print('🔄 Socket handler onNewMessage called');
+      print('   data: $data');
+      print('   data type: ${data.runtimeType}');
+      
       if (data['taskId'] != null) {
         final tid = data['taskId'].toString();
-        final message = Message.fromJson(data);
-        ref.read(messagesForTaskProvider(tid).notifier).addMessage(message);
+        print('   taskId extracted: $tid');
+        try {
+          final message = Message.fromJson(data);
+          print('   ✅ Message converted from JSON');
+          print('   message.id: ${message.id}');
+          print('   message.text: ${message.text}');
+          ref.read(messagesForTaskProvider(tid).notifier).addMessage(message);
+          print('   ✅ Message added to provider');
+        } catch (e) {
+          print('   ❌ Error converting message: $e');
+        }
+      } else {
+        print('   ❌ No taskId in data');
       }
     },
     onChatAlert: (data) {
@@ -168,10 +204,9 @@ final socketServiceProvider = Provider<SocketService>((ref) {
     },
     // ✅ FIX #6: Add callback to reload messages when reconnecting
     onReconnect: () {
-      print('📨 Socket reconnected - invalidating all message providers for catch-up');
-      // Invalidate all message providers to trigger reload from server
-      // This causes all open message providers to refetch from the API
-      ref.invalidateSelf();
+      print('📨 Socket reconnected - should reload messages');
+      // Don't invalidate self - this causes socket to be recreated!
+      // Instead, just let the app know socket is back and messages can be fetched
     },
   );
   

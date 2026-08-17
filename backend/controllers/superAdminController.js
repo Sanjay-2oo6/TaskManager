@@ -56,26 +56,29 @@ const createOrganization = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Admin email already exists' });
     }
-    
-    // ✅ Create organization FIRST so we have the ID
-    const organization = await Organization.create({
+
+    // ✅ FIX 14: Create organization first (with placeholder adminId), then admin, then update org
+    // Step 1: Create a temporary organization with the super admin as adminId
+    // (This satisfies the Organization.adminId requirement)
+    let organization = await Organization.create({
       name: sanitizeText(name.trim()),
       slug: slug.toLowerCase().trim(),
       memberLimit: memberLimit || 10,
       memberCount: 1,
+      adminId: req.user.id, // Temporarily set to super admin
       createdBy: req.user.id,
     });
     
-    // ✅ Create admin user with organization ID
+    // Step 2: Create admin user with the organization ID
     const admin = await User.create({
       name: sanitizeText(adminName.trim()),
       email: sanitizeText(adminEmail.toLowerCase().trim()),
       password: adminPassword,
       role: 'admin',
-      organizationId: organization._id,  // ✅ Use real organization ID
+      organizationId: organization._id, // Now we have a real organization
     });
     
-    // ✅ Update organization with admin ID
+    // Step 3: Update organization with the real admin ID
     organization.adminId = admin._id;
     await organization.save();
     

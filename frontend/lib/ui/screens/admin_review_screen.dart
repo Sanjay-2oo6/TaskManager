@@ -4,69 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/services/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../state/task_providers.dart';
-
-class SubmissionReview {
-  final String id;
-  final String taskId;
-  final String taskTitle;
-  final String employeeName;
-  final List<String> beforeFilesUrls;
-  final List<String> beforeFileNames;
-  final List<String> afterFilesUrls;
-  final List<String> afterFileNames;
-  final String? description;
-  final String status;
-  final String? previousSubmissionId; // ✅ FIX 10: Track resubmission chain
-
-  SubmissionReview({
-    required this.id,
-    required this.taskId,
-    required this.taskTitle,
-    required this.employeeName,
-    required this.beforeFilesUrls,
-    required this.beforeFileNames,
-    required this.afterFilesUrls,
-    required this.afterFileNames,
-    this.description,
-    required this.status,
-    this.previousSubmissionId,
-  });
-
-  factory SubmissionReview.fromJson(Map<String, dynamic> json) {
-    return SubmissionReview(
-      id: json['_id'] ?? '',
-      taskId: (json['task'] is Map ? json['task']['_id']?.toString() : null) ?? json['taskId']?.toString() ?? '',
-      taskTitle: (json['task'] is Map ? json['task']['title']?.toString() : null) ?? json['taskTitle']?.toString() ?? 'Unknown Task',
-      employeeName: (json['employee'] is Map ? json['employee']['name']?.toString() : null) ?? json['employeeName']?.toString() ?? 'Unknown Employee',
-      beforeFilesUrls: List<String>.from(json['beforeFilesUrls'] ?? []),
-      beforeFileNames: List<String>.from(json['beforeFileNames'] ?? []),
-      afterFilesUrls: List<String>.from(json['afterFilesUrls'] ?? []),
-      afterFileNames: List<String>.from(json['afterFileNames'] ?? []),
-      description: json['description'],
-      status: json['status'] ?? 'pending',
-      previousSubmissionId: json['previousSubmissionId']?.toString(), // ✅ FIX 10: Parse resubmission link
-    );
-  }
-}
-
-final submissionsProvider =
-    FutureProvider<List<SubmissionReview>>((ref) async {
-  // ONLY FETCH PENDING AS REQUESTED
-  final response = await ApiClient().getPendingSubmissions();
-      
-  if (response.statusCode == 200) {
-    final List data = response.data['data'];
-    return data.map((json) => SubmissionReview.fromJson(json)).toList();
-  }
-  return [];
-});
+import '../../state/submission_providers.dart';
 
 class AdminReviewScreen extends ConsumerWidget {
   const AdminReviewScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final submissionsAsync = ref.watch(submissionsProvider);
+    final submissionsAsync = ref.watch(pendingSubmissionsProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
@@ -92,7 +37,7 @@ class AdminReviewScreen extends ConsumerWidget {
                     const Text('Check your connection and try again', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => ref.invalidate(submissionsProvider),
+                      onPressed: () => ref.invalidate(pendingSubmissionsProvider),
                       style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryCoral, foregroundColor: Colors.white),
                       child: const Text('Retry'),
                     ),
@@ -100,7 +45,7 @@ class AdminReviewScreen extends ConsumerWidget {
                 ),
               ),
               data: (submissions) => RefreshIndicator(
-                onRefresh: () => ref.refresh(submissionsProvider.future),
+                onRefresh: () => ref.refresh(pendingSubmissionsProvider.future),
                 color: AppTheme.primaryCoral,
                 backgroundColor: AppTheme.surfaceWhite,
                 child: submissions.isEmpty
@@ -235,7 +180,7 @@ class _ReviewCard extends ConsumerWidget {
         // ✅ FIX #1 (PHASE 1): Invalidate both submissions AND tasks + task detail
         // When approval/rejection happens, the backend emits task-updated event,
         // but we also invalidate here to ensure immediate UI refresh for members viewing the task
-        ref.invalidate(submissionsProvider);
+        ref.invalidate(pendingSubmissionsProvider);
         ref.invalidate(tasksProvider);
         if (submission.taskId.isNotEmpty) {
           ref.invalidate(taskDetailProvider(submission.taskId));

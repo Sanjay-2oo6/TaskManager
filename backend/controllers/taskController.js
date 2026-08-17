@@ -863,4 +863,70 @@ const bulkUpdateTasks = async (req, res) => {
   }
 };
 
-module.exports = { createTask, getUserTasks, getAllTasks, getTaskById, updateTask, deleteTask, assignTask, addTaskComment, bulkUpdateTasks };
+/**
+ * ✅ FIX: File proxy endpoint for CORS bypass
+ * When running locally, S3 CORS headers don't allow localhost requests
+ * This endpoint generates a fresh signed URL and returns it with proper CORS headers
+ * 
+ * @route   GET /api/v1/tasks/file-proxy
+ * @access  Private (authenticated users only)
+ * @query   key {string} - S3 object key to download
+ */
+const getFileProxy = async (req, res) => {
+  try {
+    const { key } = req.query;
+    
+    if (!key) {
+      return res.status(400).json({ success: false, message: 'File key is required' });
+    }
+    
+    // ✅ SECURITY: Validate organization access - ensure user can only access files from their org's tasks
+    const task = await Task.findOne({
+      $or: [
+        { adminFiles: key },
+      ],
+      organizationId: req.user.organizationId
+    }).select('_id organizationId');
+    
+    if (!task) {
+      return res.status(403).json({ success: false, message: 'Unauthorized: File not found or belongs to different organization' });
+    }
+    
+    // ✅ SECURITY: Normalize the key to prevent directory traversal
+    const normalizedKey = key.replace(/\.\.\//g, '').trim();
+    if (normalizedKey !== key) {
+      return res.status(400).json({ success: false, message: 'Invalid file key format' });
+    }
+    
+    // Generate a fresh signed URL
+    try {
+      const signedUrl = await s3Service.getSignedImageUrl(normalizedKey);
+      
+      // Add CORS headers so frontend can fetch it
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      
+      return res.json({ success: true, data: { url: signedUrl } });
+    } catch (s3Error) {
+      console.error('S3 signed URL generation failed:', s3Error);
+      return res.status(500).json({ success: false, message: 'Failed to generate file URL' });
+    }
+  } catch (error) {
+    console.error('File proxy error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { 
+  createTask, 
+  getUserTasks, 
+  getAllTasks, 
+  getTaskById, 
+  updateTask, 
+  deleteTask, 
+  assignTask, 
+  addTaskComment, 
+  bulkUpdateTasks,
+  getFileProxy
+};

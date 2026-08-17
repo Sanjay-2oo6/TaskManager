@@ -112,7 +112,7 @@ class SyncService {
 
     final formData = FormData.fromMap({
       'taskId': taskId,
-      'organizationId': action.organizationId,
+      // ✅ FIX: Removed organizationId - backend derives from JWT token
       'description': description,
     });
 

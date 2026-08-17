@@ -9,7 +9,8 @@ const {
   deleteTask,
   assignTask,
   addTaskComment,
-  bulkUpdateTasks
+  bulkUpdateTasks,
+  getFileProxy
 } = require('../controllers/taskController');
 
 // Assuming middleware exists
@@ -21,6 +22,9 @@ const { upload } = require('../utils/upload');
 
 // ✅ PERFORMANCE: Import caching middleware
 const { cacheShort, cacheMedium, invalidateCache } = require('../middleware/cache');
+
+// ✅ FIX: File proxy endpoint for localhost development (CORS bypass)
+router.get('/file-proxy', protect, getFileProxy);
 
 // Create task (admin only)
 // Upload middleware must come BEFORE validation so req.body is populated

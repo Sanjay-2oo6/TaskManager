@@ -42,6 +42,10 @@ class SocketService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(AppConstants.tokenKey) ?? '';
 
+    print('🔌 Socket connecting to: ${AppConstants.baseUrl}');
+    print('   Token present: ${token.isNotEmpty}');
+    print('   Token (first 20 chars): ${token.length > 20 ? token.substring(0, 20) : token}...');
+
     _socket = IO.io(AppConstants.baseUrl, 
       IO.OptionBuilder()
         .setTransports(['websocket', 'polling'])
@@ -54,6 +58,9 @@ class SocketService {
     
     _socket!.onConnect((_) {
       print('📡 Radiant Socket Connection Established: ${_socket!.id}');
+      print('   Connected: ${_socket!.connected}');
+      print('   Disconnected: ${_socket!.disconnected}');
+      print('   Server confirmed connection');
       // Auto-rejoin the active room if we were previously in one (Healing Logic)
       if (_currentTaskId != null) {
         print('🩹 Healing: Auto-rejoining room task_$_currentTaskId');
@@ -61,9 +68,18 @@ class SocketService {
       }
     });
 
-    _socket!.onConnectError((data) => print('❌ Socket Connection Error: $data'));
+    _socket!.onConnectError((data) {
+      print('❌ Socket Connection Error: $data');
+      print('   Error data type: ${data.runtimeType}');
+      if (data is Map) {
+        print('   Error details: ${data.toString()}');
+      }
+    });
     _socket!.on('connect_timeout', (data) => print('❌ Socket Connection Timeout: $data'));
-    _socket!.on('error', (data) => print('❌ Socket Error: $data'));
+    _socket!.on('error', (data) {
+      print('❌ Socket Error: $data');
+      print('   Error type: ${data.runtimeType}');
+    });
     _socket!.onReconnect((_) => print('🔄 Socket Reconnecting...'));
     _socket!.on('reconnect_attempt', (data) => print('🔄 Socket Reconnect Attempt: $data'));
 
@@ -96,7 +112,14 @@ class SocketService {
     });
 
     _socket!.on('new-chat-message', (data) {
-      print('💬 Real-time Pulse: New Chat Message');
+      print('💬 Real-time Pulse: New Chat Message Received');
+      print('   Data: $data');
+      print('   Type: ${data.runtimeType}');
+      if (data is Map) {
+        print('   taskId: ${data['taskId']}');
+        print('   sender: ${data['sender']}');
+        print('   text: ${data['text']}');
+      }
       onNewMessage(data);
     });
 
@@ -126,9 +149,19 @@ class SocketService {
   }
 
   void joinChat(String taskId) {
-    if (_socket == null || !_socket!.connected) return;
+    print('🚪 joinChat called for taskId: $taskId');
+    print('   socket: $_socket');
+    print('   connected: ${_socket?.connected}');
+    
+    if (_socket == null || !_socket!.connected) {
+      print('⚠️ joinChat: Socket not ready, skipping');
+      return;
+    }
+    
     _currentTaskId = taskId;
+    print('📨 Emitting join-task event for: $taskId');
     _socket!.emit('join-task', taskId);
+    print('✅ join-task emitted');
   }
 
   void leaveChat(String taskId) {
@@ -138,14 +171,31 @@ class SocketService {
 
   /// senderId is kept as a parameter for API compatibility but is ignored by the server.
   void sendMessage(String taskId, String senderId, String text) {
-    if (_socket == null || !_socket!.connected) {
-      print('⚠️ Message queued (offline). Will send when online.');
+    print('📤 sendMessage called:');
+    print('   taskId: $taskId');
+    print('   senderId: $senderId');
+    print('   text: $text');
+    print('   socket: $_socket');
+    print('   connected: ${_socket?.connected}');
+    
+    if (_socket == null) {
+      print('❌ Socket is NULL - connect() may not have completed');
       return;
     }
+    
+    if (!_socket!.connected) {
+      print('❌ Socket NOT CONNECTED');
+      print('   Socket ID: ${_socket!.id}');
+      print('   Disconnected: ${_socket!.disconnected}');
+      return;
+    }
+    
+    print('✅ Socket connected, emitting send-message');
     _socket!.emit('send-message', {
       'taskId': taskId,
       'text': text,
     });
+    print('✅ Emitted send-message to server');
   }
 
   void emitTyping(String taskId, String userName) {

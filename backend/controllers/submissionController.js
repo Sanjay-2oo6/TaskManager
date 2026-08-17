@@ -108,7 +108,13 @@ exports.createSubmission = async (req, res) => {
       taskId, 
       { status: 'submitted', submission: submission._id },
       { new: true }
-    );
+    ).populate('assignedTo createdBy', 'name username');
+
+    console.log('✅ Task status updated to submitted:', { 
+      taskId: taskId, 
+      newStatus: updatedTask?.status,
+      updatedTask: updatedTask?.toObject ? updatedTask.toObject() : updatedTask 
+    });
 
     // Add history entry for resubmission
     if (updatedTask && isResubmission) {
@@ -123,10 +129,15 @@ exports.createSubmission = async (req, res) => {
 
     // Emit real-time pulse with full data
     if (io) {
-      const transformedTask = await Task.findById(taskId).populate('assignedTo createdBy', 'name username');
       const room = `org_${organizationId}`;
+      console.log(`📡 Emitting task-updated to room: ${room}`, {
+        taskId: taskId,
+        status: 'submitted',
+        taskObjectKeys: updatedTask ? Object.keys(updatedTask.toObject()) : []
+      });
       io.to(room).emit('new-submission', { taskId, submissionId: submission._id, employeeName: employee.name, submission: submission.toObject() });
-      io.to(room).emit('task-updated', { taskId, status: 'submitted', task: transformedTask.toObject() });
+      io.to(room).emit('task-updated', { taskId, status: 'submitted', task: updatedTask.toObject() });
+      console.log('✅ Socket events emitted successfully');
     }
 
     res.status(201).json({ success: true, data: submission, message: 'Mission evidence delivered successfully.' });
@@ -272,6 +283,13 @@ exports.updateSubmissionStatus = async (req, res) => {
       task.status = taskStatus;
       task.history.push({ action: `Submission ${status}`, user: req.user ? req.user.id : null, details: adminFeedback || `Admin ${status} verified submission.` });
       await task.save();
+      console.log('✅ Task status updated to ' + taskStatus, {
+        taskId: submission.task,
+        newStatus: task.status,
+        submissionStatus: status
+      });
+    } else {
+      console.warn('⚠️ Task not found when updating submission status:', submission.task);
     }
 
     // Emit real-time pulse with full data
@@ -282,8 +300,16 @@ exports.updateSubmissionStatus = async (req, res) => {
       
       if (transformedTask) {
         const room = `org_${req.user.organizationId}`;
+        console.log(`📡 Emitting submission-reviewed and task-updated to room: ${room}`, {
+          status: status,
+          taskStatus: taskStatus,
+          taskId: submission.task
+        });
         io.to(room).emit('submission-reviewed', { submissionId: submission._id, status, taskId: submission.task, task: transformedTask.toObject(), submission: submission.toObject() });
         io.to(room).emit('task-updated', { taskId: submission.task, status: taskStatus, task: transformedTask.toObject() });
+        console.log('✅ Socket events emitted for submission review');
+      } else {
+        console.warn('⚠️ Transformed task is null - socket events not emitted');
       }
 
       // --- System Message for Chat Timeline ---

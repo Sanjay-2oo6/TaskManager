@@ -90,6 +90,7 @@ class _ProofUploadScreenState extends ConsumerState<ProofUploadScreen> {
       );
 
       if (mounted) {
+        print('✅ Submission successful, refreshing providers');
         setState(() {
           _beforeFiles = [];
           _afterFiles = [];
@@ -97,8 +98,11 @@ class _ProofUploadScreenState extends ConsumerState<ProofUploadScreen> {
         });
         
         // ✅ FIX: Refresh both task detail and task list immediately after successful submission
+        print('🔄 Refreshing taskDetailProvider for ${widget.taskId}');
         ref.refresh(taskDetailProvider(widget.taskId));
+        print('🔄 Refreshing tasksProvider');
         ref.refresh(tasksProvider);
+        print('✅ Providers refreshed');
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Submission sent successfully!'), backgroundColor: AppTheme.successGreen),

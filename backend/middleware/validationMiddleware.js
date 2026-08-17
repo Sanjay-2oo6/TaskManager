@@ -238,7 +238,8 @@ Object.assign(validationSchemas, {
   // POST /submissions (create submission)
   createSubmission: Joi.object({
     taskId: commonSchemas.objectId.required(),
-    description: commonSchemas.text,
+    // ✅ FIX: description is optional and can be empty - user may not add notes
+    description: commonSchemas.text.allow('', null).optional(),
     status: Joi.string()
       .valid('pending', 'approved', 'rejected')
       .default('pending')

@@ -46,10 +46,22 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
     // Guard: the taskId from socket may come as an ObjectId object
     // We compare both the full string and just the hex id part
     final msgTaskId = message.taskId;
-    if (msgTaskId != taskId && msgTaskId != taskId.toString()) return;
+    print('📥 addMessage called:');
+    print('   message.taskId: $msgTaskId');
+    print('   expected taskId: $taskId');
+    print('   match: ${msgTaskId == taskId}');
+    print('   message.text: ${message.text}');
+    
+    if (msgTaskId != taskId && msgTaskId != taskId.toString()) {
+      print('❌ TaskId mismatch - skipping message');
+      return;
+    }
 
     // Dedup: never add the same message ID twice
-    if (message.id.isNotEmpty && state.messages.any((m) => m.id == message.id)) return;
+    if (message.id.isNotEmpty && state.messages.any((m) => m.id == message.id)) {
+      print('⚠️ Duplicate message ID - skipping');
+      return;
+    }
 
     // Remove any stuck optimistic messages with the same text+sender before appending
     // This handles the case where the optimistic replace logic might fail
@@ -57,7 +69,9 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
       !(m.isSending && m.text == message.text && m.senderId == message.senderId)
     ).toList();
 
-    state = state.copyWith(messages: [...cleaned, message]);
+    final newMessages = [...cleaned, message];
+    print('✅ Adding message - new total count: ${newMessages.length}');
+    state = state.copyWith(messages: newMessages);
   }
 
 

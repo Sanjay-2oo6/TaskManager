@@ -103,6 +103,10 @@ io.on('connection', (socket) => {
 
   socket.on('send-message', async (data) => {
     try {
+      console.log('\n🔵 SOCKET EVENT: send-message received');
+      console.log('   data:', data);
+      console.log('   socket.user:', { id: socket.user?.id, role: socket.user?.role, org: socket.user?.organizationId });
+      
       // SECURITY: Always use the authenticated socket user — never trust senderId from the client
       const senderId = socket.user.id;
 
@@ -110,6 +114,8 @@ io.on('connection', (socket) => {
         console.warn('⚠️ Incoming message blocked: Missing taskId or text');
         return;
       }
+      
+      console.log('✅ Message validation passed');
 
       const Message = require('./models/Message');
       const Task = require('./models/Task');
@@ -120,22 +126,32 @@ io.on('connection', (socket) => {
         console.warn(`⚠️ send-message blocked: Task ${data.taskId} not found`);
         return;
       }
+      console.log('✅ Task found, checking authorization');
+      
       const isAssigned = task.assignedTo.some(uid => uid.toString() === senderId);
       const isPrivileged = ['admin', 'super_admin'].includes(socket.user.role);
+      
+      console.log('   isAssigned:', isAssigned);
+      console.log('   isPrivileged:', isPrivileged);
+      
       if (!isAssigned && !isPrivileged) {
         console.warn(`⚠️ send-message blocked: User ${senderId} not assigned to task ${data.taskId}`);
         return;
       }
       
+      console.log('✅ Authorization passed');
+      
       // ✅ SECURITY: Sanitize message text to prevent XSS
       const sanitizedText = sanitizeText(data.text.trim());
       
+      console.log('📝 Creating message in DB');
       const newMessage = await Message.create({
         taskId: data.taskId,
         organizationId: socket.user.organizationId, // ✅ MULTI-TENANT: Add organizationId
         sender: senderId,
         text: sanitizedText
       });
+      console.log('✅ Message created:', { id: newMessage._id, text: sanitizedText });
 
       const [populatedMessage, taskForAlert] = await Promise.all([
         Message.findById(newMessage._id).populate('sender', 'name role'),
@@ -144,7 +160,8 @@ io.on('connection', (socket) => {
 
       const room = `task_${data.taskId}`;
       const clients = io.sockets.adapter.rooms.get(room);
-      console.log(`📡 Sending chat message to ${room} (${clients ? clients.size : 0} clients in room)`);
+      console.log(`📡 Broadcasting to room ${room} (${clients ? clients.size : 0} clients)`);
+      console.log(`   populatedMessage:`, { id: populatedMessage._id, text: populatedMessage.text, sender: populatedMessage.sender?.name });
 
       // 1. Broadcast to everyone in the room (currently viewing the chat) — EXCLUDING sender
       socket.to(room).emit('new-chat-message', populatedMessage);
