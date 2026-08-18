@@ -63,29 +63,38 @@ app.use(compression({
 
 // 🛡️ SECURITY FIX 0.13: Environment-specific CORS configuration
 if (process.env.NODE_ENV === 'production') {
-  // Production: Strict CORS - only allow our domain
-  const allowedOrigins = [
-    process.env.FRONTEND_URL || 'https://yourdomain.com',
-  ];
+  // Production: Allow specified origins OR allow all if not configured
+  // ✅ FIX: If FRONTEND_URL or ALLOWED_ORIGINS not set, allow all origins (for Flutter mobile)
+  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : null);
   
-  app.use(cors({
-    origin: function(origin, callback) {
-      // Allow requests with no origin (like mobile apps)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        logger.security('CORS rejected request', { 
-          origin,
-          path: '/api',
-          reason: 'Origin not in whitelist'
-        });
-        callback(new Error('CORS not allowed'));
-      }
-    },
-    credentials: true
-  }));
+  if (allowedOrigins) {
+    // Strict mode: only allow specified origins
+    app.use(cors({
+      origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or localhost)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          logger.security('CORS rejected request', { 
+            origin,
+            path: '/api',
+            reason: 'Origin not in whitelist'
+          });
+          callback(new Error('CORS not allowed'));
+        }
+      },
+      credentials: true
+    }));
+    logger.info('CORS: Production mode - allowed origins:', allowedOrigins);
+  } else {
+    // Relaxed mode: allow all origins (for Flutter mobile apps which may not have a fixed origin)
+    app.use(cors());
+    logger.info('CORS: Production mode - no origin restrictions (all origins allowed)');
+  }
 } else {
   // Development: Allow all origins for easy testing
   app.use(cors());
@@ -94,6 +103,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // 🛡️ SECURITY FIX 0.13: Add security headers based on environment
 app.use(securityHeaders);
+
+// ✅ FIX: Explicitly handle OPTIONS requests (preflight) for CORS
+app.options('*', cors());
 
 // 🛡️ SECURITY FIX 0.11: Structured logging for all API requests
 app.use(requestLogger);

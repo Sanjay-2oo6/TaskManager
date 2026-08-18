@@ -2,10 +2,10 @@ const rateLimit = require('express-rate-limit');
 
 // ✅ SECURITY: Rate limiting to prevent brute force and DoS attacks
 
-// Login endpoint: 100 attempts per 15 minutes per IP (increased for testing)
+// Login endpoint: 100 attempts per 15 minutes per IP (for unauthenticated users)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 attempts per window (increased from 5 for testing)
+  max: 100, // 100 attempts per window (protects against brute force)
   message: 'Too many login attempts from this IP. Please try again in 15 minutes.',
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
@@ -16,9 +16,9 @@ const loginLimiter = rateLimit({
     // Don't rate limit authenticated admin users (for testing)
     return req.user?.role === 'admin';
   },
-  // Use default IP-based key generator (handles IPv4 and IPv6 properly)
+  // Use IP-based key for unauthenticated login attempts (brute force protection)
   handler: (req, res) => {
-    console.warn(`🚨 RATE_LIMIT: Login - IP: ${req.ip} - Exceeded 5 attempts`);
+    console.warn(`🚨 RATE_LIMIT: Login - IP: ${req.ip} - Exceeded 100 attempts`);
     res.status(429).json({
       success: false,
       message: 'Too many login attempts. Please try again in 15 minutes.',
@@ -53,18 +53,33 @@ const createUserLimiter = rateLimit({
   }
 });
 
-// General API: 500 requests per minute per IP (increased for testing)
+// General API: 500 requests per minute per authenticated user / IP
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 500, // 500 requests per minute (increased from 100 for testing)
-  message: 'Too many requests from this IP. Please slow down.',
+  max: 500, // 500 requests per minute
+  message: 'Too many requests. Please slow down.',
   standardHeaders: true,
   legacyHeaders: false,
   // ✅ FIX 13: Skip rate limiting for OPTIONS (preflight) requests
-  skip: (req) => req.method === 'OPTIONS',
-  // Use default IP-based key generator (handles IPv4 and IPv6 properly)
+  skip: (req) => {
+    if (req.method === 'OPTIONS') return true;
+    // Skip for admin users
+    return req.user?.role === 'admin';
+  },
+  // ✅ ENHANCEMENT: Use user ID for authenticated requests (fixes WiFi sharing issue)
+  // For authenticated users: rate limit per user ID (so 15 users on same WiFi = 15 separate limits)
+  // For unauthenticated users: rate limit per IP (brute force protection)
+  keyGenerator: (req) => {
+    if (req.user?.id) {
+      // Authenticated: use user ID (each user gets own limit bucket)
+      return `user:${req.user.id}`;
+    }
+    // Unauthenticated: use IP (fallback to default IP generator)
+    return undefined;
+  },
   handler: (req, res) => {
-    console.warn(`🚨 RATE_LIMIT: API - IP: ${req.ip} - Exceeded 100 req/min on ${req.path}`);
+    const key = req.user?.id ? `user:${req.user.id}` : req.ip;
+    console.warn(`🚨 RATE_LIMIT: API - ${key} - Exceeded 500 req/min on ${req.path}`);
     res.status(429).json({
       success: false,
       message: 'Too many requests. Please slow down.',
@@ -73,21 +88,28 @@ const apiLimiter = rateLimit({
   }
 });
 
-// Submission endpoint: 5 submissions per hour per user
+// Submission endpoint: 5 submissions per hour per authenticated user
 const submissionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5, // 5 submissions per hour
   // ✅ FIX 13: Skip rate limiting for OPTIONS (preflight) requests
-  skip: (req) => req.method === 'OPTIONS',
+  skip: (req) => {
+    if (req.method === 'OPTIONS') return true;
+    // Skip for admin users
+    return req.user?.role === 'admin';
+  },
+  // ✅ ENHANCEMENT: Use user ID for per-user submission limits
   keyGenerator: (req) => {
-    // If authenticated, use user ID, otherwise return undefined for default IP limiting
+    // Authenticated: use user ID (each user gets own bucket)
     if (req.user?.id) {
       return `user:${req.user.id}`;
     }
+    // Fallback: use IP
     return undefined;
   },
   handler: (req, res) => {
-    console.warn(`🚨 RATE_LIMIT: Submission - User: ${req.user?.id} - Exceeded 5 submissions/hour`);
+    const key = req.user?.id ? `user:${req.user.id}` : req.ip;
+    console.warn(`🚨 RATE_LIMIT: Submission - ${key} - Exceeded 5 submissions/hour`);
     res.status(429).json({
       success: false,
       message: 'Too many submissions. Please try again later.',

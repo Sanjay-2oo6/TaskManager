@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 
 const protect = async (req, res, next) => {
+  // ✅ FIX: Skip auth check for preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   let token;
 
   if (
