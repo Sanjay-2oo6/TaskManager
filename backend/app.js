@@ -62,14 +62,13 @@ app.use(compression({
 }));
 
 // 🛡️ SECURITY FIX 0.13: Environment-specific CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : null);
+
 if (process.env.NODE_ENV === 'production') {
-  // Production: Allow specified origins OR allow all if not configured
-  // ✅ FIX: If FRONTEND_URL or ALLOWED_ORIGINS not set, allow all origins (for Flutter mobile)
-  const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : null);
-  
-  if (allowedOrigins) {
+  // Production: Be explicit about CORS to avoid preflight errors
+  if (allowedOrigins && allowedOrigins.length > 0) {
     // Strict mode: only allow specified origins
     app.use(cors({
       origin: function(origin, callback) {
@@ -87,17 +86,30 @@ if (process.env.NODE_ENV === 'production') {
           callback(new Error('CORS not allowed'));
         }
       },
-      credentials: true
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      optionsSuccessStatus: 200
     }));
     logger.info('CORS: Production mode - allowed origins:', allowedOrigins);
   } else {
-    // Relaxed mode: allow all origins (for Flutter mobile apps which may not have a fixed origin)
-    app.use(cors());
+    // Relaxed mode: allow all origins (for Flutter mobile apps)
+    app.use(cors({
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      optionsSuccessStatus: 200
+    }));
     logger.info('CORS: Production mode - no origin restrictions (all origins allowed)');
   }
 } else {
-  // Development: Allow all origins for easy testing
-  app.use(cors());
+  // Development: Allow all origins with explicit options
+  app.use(cors({
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+  }));
   logger.info('CORS: Development mode - all origins allowed');
 }
 
